@@ -87,8 +87,7 @@ app.get('/api/*',function(req,res){
       /* Evict at duration specified by policy, or default to 24-hour */
       var duration = _reply.policy.session_duration || 86400000;
       
-      var now = new Date();
-      client.zadd("active",now.valueOf()+duration,_res['token'],redis.print);
+      client.zadd("active",(new Date()).valueOf()+duration,_res['token'],redis.print);
 
 
       client.pexpire(_res['token'],duration,

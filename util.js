@@ -6,6 +6,9 @@ var util = {
     _req['action'] = path[1];
     _req['endpt'] = path[2];
     _req['path'] = path.slice(3,path.length)
+  },
+  'log':function(str){
+    if(logging)console.log(str);
   }
 }
 
