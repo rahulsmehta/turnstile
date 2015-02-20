@@ -113,6 +113,18 @@ app.get('/api/*',function(req,res){
         res.status(404).send("404 Not Found\n");
     });
   }
+  else if(endpt == "active_sessions"){
+    console.log("Active sessions...");
+    client.zrange("active",0,-1,function(err,reply){
+      _res['sessions'] = [];
+      reply.forEach(function(item){
+        _res['sessions'].push(item);
+      });
+      res.status(200).send(JSON.stringify(_res));
+    });
+  }
+  else
+    res.status(200).send("200 Okay"+'\n');
 });
 
 
@@ -141,16 +153,6 @@ app.post('/api/*',function(req,res){
     res.status(200).send(JSON.stringify(_key_data));
 
   }
-  else if(endpt == "active_sessions"){
-    console.log("Active sessions...");
-    client.zrange("active",0,-1,function(err,reply){
-      console.log(reply);
-      res.status(200).send("200 Okay"+'\n');
-    });
-    res.status(200).send("200 Okay"+'\n');
-  }
-  else
-    res.status(200).send("200 Okay"+'\n');
 });
 
 /* Evict expired session tokens at the resolution specified
