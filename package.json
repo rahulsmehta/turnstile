@@ -11,7 +11,7 @@
   "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rm -f *.rdb"
+    "clean": "rm -f *.rdb *.log *.swp"
   },
   "repository": {
     "type": "git",
