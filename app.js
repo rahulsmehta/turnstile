@@ -27,7 +27,10 @@ if(t.status() == "CONNECTED"){
       t.getSessionInfo(session_token,function(err,reply){
         if(err){
           console.log('Session Info: '+err);
-          process.exit();
+          t.getActiveSessions(function(err,reply){
+            console.log(reply);
+            process.exit();
+          });
         }
       });
     });

@@ -47,8 +47,11 @@ function Turnstile(_config){
       client.hset([token,"policy",JSON.stringify(policy)],function(){});
       client.hset([token,"allowance",policy.req_per_int],function(){});
 
+
       var duration = policy.session_duration || 
         config.defaultPolicy['session_duration'];
+
+      client.zadd("active",(new Date()).valueOf()+duration,token,function(){});
 
       client.pexpire(token,duration,
           function(_err,reply){
@@ -75,7 +78,28 @@ function Turnstile(_config){
         else if(reply == 0)
           return callback("ERR_NOT_FOUND",null);
       });
-    }
+    },
+    'getActiveSessions':function(callback){
+      client.exists("active",function(err,reply){
+        if(err)
+          return callback("INTERNAL_SERVER_ERROR"+err);
+        if(reply == 0)
+          return callback(null,"NO_ACTIVE_SESSIONS");
+        else if(reply == 1){
+          client.zrange(["active",0,-1],function(err,reply){
+            if(err)
+              return callback("INTERNAL_SERVER_ERROR"+err);
+            else{
+              response = [];
+              reply.forEach(function(item){
+                response.push(item);
+              });
+              return callback(null,response);
+            }
+          }); 
+        }
+      });
+    },
   }
     
 
