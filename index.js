@@ -16,6 +16,7 @@ function Turnstile(_config){
     {'req_per_int':100,'session_duration':86400000};
   var client = null;
 
+
   var methods = {
     'status': function(){return (client)?"CONNECTED":"NOT CONNECTED";},
     'getRedisClient': function(){
@@ -27,7 +28,10 @@ function Turnstile(_config){
     'connect':function(){client = redis.createClient(config.port,
       config.host);},
     'getProp':function(propName,callback){
-        return callback(config[propName]);
+        var err = null;
+        if(!config[propName])
+          err = "ERR_PROP_NOT_FOUND";
+        return callback(err,config[propName]);
       },
     'getPropSync':function(propName){return config[propName];},
     'genSessionToken': function(user,policy,callback){
@@ -55,7 +59,7 @@ function Turnstile(_config){
 
       client.pexpire(token,duration,
           function(_err,reply){
-            console.log("Generated new session token for %s: %s",display,token);
+            //console.log("Generated new session token for %s: %s",display,token);
             return callback({'api_key':user.api_key,'session_token':token});
           });
     },
@@ -70,7 +74,10 @@ function Turnstile(_config){
                 return callback(null,response);
               else{
                 response['uid'] = _reply;
-                return callback(null,response);
+                client.pttl(sessionToken,function(err,ttl){
+                  response['ttl'] = ttl;
+                  return callback(null,response);
+                });
               }
             });
           });
@@ -102,6 +109,25 @@ function Turnstile(_config){
     },
   }
     
+  setInterval(function(){
+    if(methods.status() != "CONNECTED"){
+      console.log(methods.status());
+      return;
+    }
+  
+    client.exists("active",function(err,reply){
+      if(reply == 0){
+        console.log("No active sessions");
+        return;
+      }
+      else{
+        var now = new Date();
+        client.zremrangebyscore("active",0,now.valueOf(),
+          function(){});
+        return;
+      }
+    });
+  },config.evictionRate);
 
   extend(Turnstile.prototype,methods);
 
