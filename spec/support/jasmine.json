@@ -4,5 +4,6 @@
     "index.spec.js"
   ],
   "helpers": [
+    "wait_run.js"
   ]
 }
