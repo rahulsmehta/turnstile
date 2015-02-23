@@ -12,7 +12,7 @@
   "devDependencies": {},
   "scripts": {
     "test": "jasmine",
-    "clean": "rm -f *.rdb *.log *.swp"
+    "clean": "rm -f *.rdb *.log .*.swp"
   },
   "repository": {
     "type": "git",

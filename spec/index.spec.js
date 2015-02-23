@@ -1,29 +1,40 @@
 var Turnstile = require('../index.js'),
     spawn = require('child_process').spawn,
-//    waitAndRun = require('./wait_run.js').waitAndRun;
     t = null,
     p_redis = null,
-    PORT = 7000;
+    redis_client = null,
+    PORT = 7000,
+    _env = "";
 
-var waitAndRun = function(escapeFunction, runFunction, escapeTime) {
-  var interval = setInterval(function() {
-    if (escapeFunction()) {
+var util = {
+  'waitAndRun':function(escapeFunction, runFunction, escapeTime) {
+    var interval = setInterval(function() {
+      if (escapeFunction()) {
+        clearMe();
+        runFunction();
+      }
+    }, 1);
+    var timeOut = setTimeout(function() {
       clearMe();
       runFunction();
+    }, escapeTime);
+    function clearMe(){
+      clearInterval(interval);
+      clearTimeout(timeOut);
     }
-  }, 1);
-  var timeOut = setTimeout(function() {
-    clearMe();
-    runFunction();
-  }, escapeTime);
-  function clearMe(){
-    clearInterval(interval);
-    clearTimeout(timeOut);
-  }
-};
+  },
+  'user':function(uid,key){
+    var user = {};
+    user['uid'] = uid;
+    user['api_key'] = key || "TEST_KEY"+(Math.floor(Math.random()*1000));
+    return user;
+  },
+  'policy':{'req_per_int':100,'session_duration':86400000},
+}
+
 
 describe("Create test instance",function(){
-  var _env = process.env.NODE_ENV || "development";
+  _env = process.env.NODE_ENV || "development";
 
   if(_env == "development"){
     describe("Start redis-server",function(){
@@ -39,11 +50,11 @@ describe("Create test instance",function(){
       p_redis.stdout.on('data',function(data){
         var _data = data.toString('utf8');
         is_success = (_data.indexOf("The server is now ready to "+
-          "accept connections on port "+PORT) != -1);
+            "accept connections on port "+PORT) != -1);
       });
       p_redis.on('error',function(){is_success = false;});
 
-      waitAndRun(function(){
+      util.waitAndRun(function(){
         return is_success != null;
       },function(){
         expect(is_success).toBe(true);
@@ -58,6 +69,10 @@ describe("Create test instance",function(){
   it("connects to redis at port "+PORT,function(){
     t.connect();
     expect(t.status()).toEqual("CONNECTED");
+  });
+  it("gets redis client for later",function(){
+    redis_client = t.getRedisClient();
+    expect(redis_client).not.toBeNull();
   });
 });
 
@@ -108,10 +123,12 @@ describe("Test property retreival",function(){
   });
 });
 
-describe("Generate tokens",function(){
+describe("Test token generation and session info",function(){
+  var reply_tokens = [];
+
   it("generates a session token and gets info (success)",function(done){
-    var user = {'uid':'test_user','api_key':'TEST_KEY'};
-    var policy = {'req_per_int':100,'session_duration':86400000};
+    var user = util.user("test_user","TEST_KEY");
+    var policy = util.policy;
     var session_token = null;
     t.genSessionToken(user,policy,function(reply){
       session_token = reply.session_token;
@@ -121,15 +138,74 @@ describe("Generate tokens",function(){
         expect(reply.api_key).toEqual("TEST_KEY");
         expect(reply.uid).toEqual("test_user");
         expect(reply.ttl).toBeGreaterThan(0);
-        done();
+        t.endSession(session_token,function(err,deleted){
+          expect(deleted).toBe(true);
+          done();
+        });
       });
     });
   });
+  it("gets session token info (fail)",function(done){
+    var session_token = "FAIL";
+    t.getSessionInfo(session_token,function(err,reply){
+      expect(err).not.toBeNull();
+      expect(err).toEqual("ERR_NOT_FOUND");
+      expect(reply).toBeNull();
+      done();
+    });
+  });
+  it("generates a bunch of tokens",function(done){
+    var tokens = 0;
+    var policy = util.policy;
+    for(var i = 0; i < 10; i++){
+      var user = util.user("test_user"+(i+1));
+      t.genSessionToken(user,policy,function(reply){
+        reply_tokens.push(reply.session_token);
+        tokens++;
+        return;
+      });
+    }
+    util.waitAndRun(function(){
+      return tokens == 10;
+    },function(){
+      t.getActiveSessions(function(err,reply){
+        expect(err).toBeNull();
+        expect(reply.num_active).toEqual(10);
+        done();
+      });
+    },10000);
+  });
+
+  it("gets active sessions (10)",function(done){
+    t.getActiveSessions(function(err,reply){
+      expect(err).toBeNull();
+      expect(reply.num_active).toEqual(10);
+      reply.sessions.forEach(function(item){
+        expect(item.length).toEqual(15);
+        expect(reply_tokens.indexOf(item)).not.toEqual(-1);
+      });
+      done();
+    });
+  });
+
+  it("ends active sessions (10)",function(done){
+    t.endSession(reply_tokens,function(err,reply){
+      expect(reply).toBe(true);
+      done();
+    });
+  });
+
+});
+
+describe("Test session duration expiry",function(){
+
 });
 
 describe("Teardown",function(){
-  it("kills redis at port "+PORT,function(){
-    expect(p_redis).not.toBeNull();
-    p_redis.kill('SIGINT');
-  });
+  if(_env == "development"){
+    it("kills redis at port "+PORT,function(){
+      expect(p_redis).not.toBeNull();
+      p_redis.kill('SIGINT');
+    });
+  }
 });

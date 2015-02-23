@@ -97,15 +97,48 @@ function Turnstile(_config){
             if(err)
               return callback("INTERNAL_SERVER_ERROR"+err);
             else{
-              response = [];
+              response = {};
+              response['sessions'] = [];
+              response['num_active'] = 0;
               reply.forEach(function(item){
-                response.push(item);
+                response['sessions'].push(item);
+                response['num_active']++;
               });
               return callback(null,response);
             }
           }); 
         }
       });
+    },
+    'endSession':function(session,callback){
+      if(typeof(session) == 'string'){
+        client.del(session,function(err,reply){
+          if(err)
+            return callback("INTERNAL_SERVER_ERROR");
+          if(reply == 0)
+            return callback(null,false);
+          else if(reply == 1){
+            client.zrem(["active",session],function(err,_reply){
+              if(reply == 0)
+                return callback(null,false);
+              else if(reply == 1)
+                return callback(null,true);
+            });
+          }
+        });
+      }
+      else if(Object.prototype.toString.call(session) 
+          == '[object Array]'){
+        session.forEach(function(item){
+          methods.endSession(item,function(err,reply){
+            if(err)
+              return callback("INTERNAL_SERVER_ERROR");
+            if(!reply)
+              return callback(null,false);
+          });
+        });
+        return callback(null,true);
+      }
     },
   }
     
@@ -128,12 +161,6 @@ function Turnstile(_config){
       }
     });
   },config.evictionRate);
-
   extend(Turnstile.prototype,methods);
-
 }
-
 module.exports = Turnstile;
-
-
-
