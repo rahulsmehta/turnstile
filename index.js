@@ -50,6 +50,7 @@ function Turnstile(_config){
       if(uid) client.hset([token,"uid",user.uid],function(){});
       client.hset([token,"policy",JSON.stringify(policy)],function(){});
       client.hset([token,"allowance",policy.req_per_int],function(){});
+      client.hset([token,"last_msg",(new Date()).valueOf()],function(){});
 
 
       var duration = policy.session_duration || 
@@ -64,26 +65,19 @@ function Turnstile(_config){
           });
     },
     'getSessionInfo': function(sessionToken,callback){
-      client.exists(sessionToken,function(err,reply){
-        if(reply == 1){
-          response = {};
-          client.hget([sessionToken,"api_key"],function(err,reply){
-            response['api_key'] = reply;
-            client.hget([sessionToken,"uid"],function(err,_reply){
-              if(!_reply)
-                return callback(null,response);
-              else{
-                response['uid'] = _reply;
-                client.pttl(sessionToken,function(err,ttl){
-                  response['ttl'] = ttl;
-                  return callback(null,response);
-                });
-              }
-            });
+      client.hgetall(sessionToken,function(err,reply){
+        var response = reply;
+        if(err)
+          return callback("INTERNAL_SERVER_ERROR");
+        if(!reply)
+          return callback("ERR_NOT_FOUND");
+        else{
+          client.pttl(sessionToken,function(err,ttl){
+            response['ttl'] = ttl;
+            delete response['allowance'];
+            return callback(null,response);
           });
         }
-        else if(reply == 0)
-          return callback("ERR_NOT_FOUND",null);
       });
     },
     'getActiveSessions':function(callback){
@@ -99,11 +93,10 @@ function Turnstile(_config){
             else{
               response = {};
               response['sessions'] = [];
-              response['num_active'] = 0;
               reply.forEach(function(item){
                 response['sessions'].push(item);
-                response['num_active']++;
               });
+              response['num_active'] = reply.length;
               return callback(null,response);
             }
           }); 

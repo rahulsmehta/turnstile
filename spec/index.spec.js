@@ -135,9 +135,14 @@ describe("Test token generation and session info",function(){
       expect(session_token).not.toBeNull();
       t.getSessionInfo(session_token,function(err,reply){
         expect(err).toBeNull();
+
         expect(reply.api_key).toEqual("TEST_KEY");
         expect(reply.uid).toEqual("test_user");
         expect(reply.ttl).toBeGreaterThan(0);
+
+        expect(reply.last_msg).not.toBe(undefined); 
+        expect(reply.last_msg).toBeGreaterThan(0);
+
         t.endSession(session_token,function(err,deleted){
           expect(deleted).toBe(true);
           done();
@@ -150,7 +155,7 @@ describe("Test token generation and session info",function(){
     t.getSessionInfo(session_token,function(err,reply){
       expect(err).not.toBeNull();
       expect(err).toEqual("ERR_NOT_FOUND");
-      expect(reply).toBeNull();
+      expect(reply).toBeFalsy();
       done();
     });
   });
