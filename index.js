@@ -47,9 +47,10 @@ function Turnstile(_config){
       var display = uid || user.api_key;
 
       client.hset([token,"api_key",user.api_key],function(){});
-      if(uid) client.hset([token,"uid",user.uid],function(){});
+      client.hset([token,"uid",user.uid],function(){});
       client.hset([token,"policy",JSON.stringify(policy)],function(){});
       client.hset([token,"allowance",policy.req_per_int],function(){});
+      client.hset([token,"rate",policy.req_per_int],function(){});
       client.hset([token,"last_msg",(new Date()).valueOf()],function(){});
 
 
@@ -109,7 +110,7 @@ function Turnstile(_config){
           if(err)
             return callback("INTERNAL_SERVER_ERROR");
           if(reply == 0)
-            return callback(null,false);
+              return callback(null,false);
           else if(reply == 1){
             client.zrem(["active",session],function(err,_reply){
               if(reply == 0)
@@ -132,6 +133,52 @@ function Turnstile(_config){
         });
         return callback(null,true);
       }
+    },
+    'setThrottleParams':function(token,last_msg,allowance,callback){
+      client.hset([token,'last_msg',last_msg],function(err){
+        if(err)
+          return callback("INTERNAL_SERVER_ERROR");
+        client.hset([token,'allowance',allowance],function(err){
+          if(err)
+            return callback("INTERNAL_SERVER_ERROR");
+          else{
+            console.log(token,last_msg,allowance);
+            return callback(null,true);
+          }
+        });
+      });
+    },
+    'throttleRequest':function(sessionToken,callback){
+      //TODO: FIX TIME PARAMATERS -- ERROR
+      client.hgetall(sessionToken,function(err,reply){
+        if(err)
+          return callback("INTERNAL_SERVER_ERROR");
+        if(!reply)
+          return callback("ERR_NOT_FOUND");
+        else{
+          var now = (new Date()).valueOf();
+          var delta = now-reply.last_msg;
+          var rate = reply.rate;
+          console.log("Rate %s",rate);
+          var allowance = reply.allowance + delta*(rate/5000); //TODO:ADD PARAM HERE
+          console.log(allowance);
+          if(allowance > reply.rate)
+            allowance = rate;  
+          if(allowance < 1.0){
+            methods.setThrottleParams(sessionToken,now,
+              allowance,function(){
+              return callback(null,false);
+            });
+          }
+          else{
+            allowance--;
+            methods.setThrottleParams(sessionToken,now,
+              allowance,function(){
+              return callback(null,true);
+            });
+          }
+        }
+      });
     },
   }
     

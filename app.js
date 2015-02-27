@@ -22,16 +22,11 @@ if(t.status() == "CONNECTED"){
     t.getSessionInfo(session_token,function(err,reply){
       if(err){process.exit();}
       console.log('Session Info: '+JSON.stringify(reply));
-      session_token += 'FORCE_ERR';
-      console.log('Session Token: '+session_token);
-      t.getSessionInfo(session_token,function(err,reply){
-        if(err){
-          console.log('Session Info: '+err);
-          t.getActiveSessions(function(err,reply){
-            console.log(reply);
-            process.exit();
-          });
-        }
+      t.throttleRequest(session_token,function(err,reply){
+        console.log(reply);
+        t.throttleRequest(session_token,function(err,reply){
+          console.log(reply);
+        });
       });
     });
   });
