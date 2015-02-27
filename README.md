@@ -95,6 +95,18 @@ A request to this endpoint could look like;
 
 	POST /api/some_other_resource?session_token=<session_token>
 
+## Testing
+Tests for turnstile are written for the Jasmine unit testing framework. To run the tests, start
+a Redis server at port `7000` by running `redis-server --port 7000`. Then, enter the `jasmine`
+command to run the test suite. Jasmine is included among the dependencies in the `package.json`
+file, but on some machines, it may be necessary to install it globally (this can be done
+by running `npm install -g jasmine`).
+
+**Warning!** Do not run the test suite on an instance of Redis that is storing testing or production
+data for your application. As part of the teardown in the tests, the `FLUSHALL` command is executed,
+flushing all the keys in the database. If you are using port `7000` for another purpose,
+simply change the `PORT` parameter in `spec/index.spec.js`.
+
 ## Under the Hood
 
 ### Storage

@@ -3,6 +3,8 @@ var redis = require('redis'),
     extend = require('extend'),
     url = require('url');
 
+DEBUG = true;
+
 function Turnstile(_config){
   if(!_config)_config = {};
   var config = {};
@@ -61,14 +63,14 @@ function Turnstile(_config){
 
       client.pexpire(token,duration,
           function(_err,reply){
-            //console.log("Generated new session token for %s: %s",display,token);
-            return callback({'api_key':user.api_key,'session_token':token});
+            //console.error("Generated new session token for %s: %s",display,token);
+            return callback(null,{'api_key':user.api_key,'session_token':token});
           });
     },
     'getSessionInfo': function(sessionToken,callback){
       client.hgetall(sessionToken,function(err,reply){
         var response = reply;
-        console.log(reply);
+        //console.error(reply);
         if(err)
           return callback("INTERNAL_SERVER_ERROR");
         if(!reply)
@@ -87,7 +89,7 @@ function Turnstile(_config){
         if(err)
           return callback("INTERNAL_SERVER_ERROR"+err);
         if(reply == 0)
-          return callback(null,"NO_ACTIVE_SESSIONS");
+          return callback(null,{'sessions':[],'num_active':0});
         else if(reply == 1){
           client.zrange(["active",0,-1],function(err,reply){
             if(err)
@@ -143,7 +145,7 @@ function Turnstile(_config){
           if(err)
             return callback("INTERNAL_SERVER_ERROR");
           else{
-            console.log("Session: %s  Last Message: %d  Allowance:%d",token,last_msg,allowance);
+            console.error("Session: %s  Last Message: %d  Allowance:%d",token,last_msg,allowance);
             return callback(null,true);
           }
         });
@@ -159,30 +161,30 @@ function Turnstile(_config){
         else{
           var now = (new Date()).valueOf();
           var delta = now-reply.last_msg;
-          console.log("Difference: %d",delta);
+          console.error("Difference: %d",delta);
           var rate = reply.rate;
-          console.log("Allowance (before): %d",reply.allowance);
+          console.error("Allowance (before): %d",reply.allowance);
           //var allowance = (reply.allowance + delta*(rate/10000))/10; 
 
           var allowance = parseFloat(reply.allowance);
           var tok = delta*(rate/10000);
           allowance += delta*(rate/10000);
 
-          console.log("Allowance (after): %d",allowance);
-          console.log("Rate: %d",rate);
+          console.error("Allowance (after): %d",allowance);
+          console.error("Rate: %d",rate);
           if(allowance > rate){
-            console.log("Setting allowance to rate...");
+            console.error("Setting allowance to rate...");
             allowance = rate;  
           }
           if(allowance < 1.0){
-            console.log("Throttle request...discarding...");
+            console.error("Throttle request...discarding...");
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){
               return callback(null,false);
             });
           }
           else{
-            console.log("Permit message...");
+            console.error("Permit message...");
             allowance--;
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){
@@ -196,13 +198,13 @@ function Turnstile(_config){
     
   setInterval(function(){
     if(methods.status() != "CONNECTED"){
-      console.log(methods.status());
+      console.error(methods.status());
       return;
     }
   
     client.exists("active",function(err,reply){
       if(reply == 0){
-        console.log("No active sessions");
+        console.error("No active sessions");
         return;
       }
       else{
