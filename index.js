@@ -68,6 +68,7 @@ function Turnstile(_config){
     'getSessionInfo': function(sessionToken,callback){
       client.hgetall(sessionToken,function(err,reply){
         var response = reply;
+        console.log(reply);
         if(err)
           return callback("INTERNAL_SERVER_ERROR");
         if(!reply)
@@ -142,7 +143,7 @@ function Turnstile(_config){
           if(err)
             return callback("INTERNAL_SERVER_ERROR");
           else{
-            console.log(token,last_msg,allowance);
+            console.log("Session: %s  Last Message: %d  Allowance:%d",token,last_msg,allowance);
             return callback(null,true);
           }
         });
@@ -158,19 +159,30 @@ function Turnstile(_config){
         else{
           var now = (new Date()).valueOf();
           var delta = now-reply.last_msg;
+          console.log("Difference: %d",delta);
           var rate = reply.rate;
-          console.log("Rate %s",rate);
-          var allowance = reply.allowance + delta*(rate/5000); //TODO:ADD PARAM HERE
-          console.log(allowance);
-          if(allowance > reply.rate)
+          console.log("Allowance (before): %d",reply.allowance);
+          //var allowance = (reply.allowance + delta*(rate/10000))/10; 
+
+          var allowance = parseFloat(reply.allowance);
+          var tok = delta*(rate/10000);
+          allowance += delta*(rate/10000);
+
+          console.log("Allowance (after): %d",allowance);
+          console.log("Rate: %d",rate);
+          if(allowance > rate){
+            console.log("Setting allowance to rate...");
             allowance = rate;  
+          }
           if(allowance < 1.0){
+            console.log("Throttle request...discarding...");
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){
               return callback(null,false);
             });
           }
           else{
+            console.log("Permit message...");
             allowance--;
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){

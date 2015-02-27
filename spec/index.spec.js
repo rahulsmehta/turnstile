@@ -34,7 +34,7 @@ var util = {
 
 
 describe("Create test instance",function(){
-  _env = process.env.NODE_ENV || "development";
+/*  _env = process.env.NODE_ENV || "development";
 
   if(_env == "development"){
     describe("Start redis-server",function(){
@@ -60,7 +60,7 @@ describe("Create test instance",function(){
         expect(is_success).toBe(true);
       },500)
     });
-  }
+  }*/
 
   it("creates Turnstile instance",function(){
     t = new Turnstile({'su':true,'port':PORT});
