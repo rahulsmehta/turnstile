@@ -209,43 +209,38 @@ describe("Test token generation and session info",function(){
   });
 
 });
-/*
-describe("Test session duration expiry",function(){
-  it("generates session token with short lifespan",
-    function(done){
-    var policy = util.policy;
-    var sessionToken = null;
-    //Set session token duration to 6 seconds
-    policy['session_duration'] = 2000;
-    t.genSessionToken(util.user('test_user','TEST_KEY'),
-      policy,function(err,reply){
-      
+
+describe("Test throttling",function(){
+  var sessionToken = null;
+  it("generates a session token",function(done){
+    var policy = {'req_per_int':2,'session_duration':10000};
+    t.genSessionToken(util.user("test_user","TEST_KEY"),policy,
+      function(err,reply){
       expect(err).toBe(null);
-      expect(reply).not.toBe(null);
-      expect(reply.api_key).toEqual("TEST_KEY");
-
+      expect(reply).toBeTruthy();
       sessionToken = reply.session_token;
-      expect(sessionToken).toBeTruthy();
-
-      t.getActiveSessions(function(err,reply){
-        expect(err).toBe(null);
-        expect(reply.num_active).toEqual(1);
-        reply.sessions.forEach(function(item){
-          expect(item).toEqual(sessionToken);
-        });
-      });
-
-      setTimeout(function(){
-        t.getActiveSessions(function(err,reply){
-          expect(err).toBe(null);
-          expect(reply.num_active).toEqual(0);
-          done();
-        });
-      },2000);
-
+      expect(sessionToken.length).toEqual(15);
+      done();
     });
   });
-});*/
+
+  it("makes multiple requests on token",function(done){
+    var count = [0,0];
+    var id = setInterval(function(){
+      t.throttleRequest(sessionToken,function(err,reply){
+        if(reply) count[0]++;
+        else count[1]++;
+//        if(t+f>=5)clearInterval(id);
+      });
+    },100);
+    util.waitAndRun(function(){
+      return (count[0]+count[1] >= 5);
+    },function(){
+      expect(count[1] > count[0]).toBe(true);
+      done();
+    },5000);
+  });
+});
 
 describe("Teardown",function(){
   it("flushes keys from redis at port "+PORT,function(done){

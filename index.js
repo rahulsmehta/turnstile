@@ -1,3 +1,4 @@
+//TODO: ADD LIFESPAN PARAMETER TO POLICY (to replace session_duration)
 var redis = require('redis'),
     SHA256 = require('crypto-js/sha256'),
     extend = require('extend'),
