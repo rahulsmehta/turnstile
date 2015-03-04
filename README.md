@@ -3,7 +3,7 @@ Turnstile.js
 Lightweight, policy-based request throttling.
 ---
 
-![Travis-CI](https://travis-ci.org/rahulsmehta/turnstile.svg?branch=integration)
+[![Travis-CI](https://travis-ci.org/rahulsmehta/turnstile.svg?branch=integration)](https://travis-ci.org/rahulsmehta/turnstile)
 
 
 Turnstile provides a lightweight request throttling service, and is framework-independent. Turnstile was developed with Express versions 4.0 and greater in mind, though it should work with any other web framework, or any other application which requires large-scale function/process throttling. Turnstile can be installed with `npm`;
