@@ -19,14 +19,14 @@ if(t.status() == "CONNECTED"){
     t.getSessionInfo(session_token,function(err,reply){
       if(err){console.log(err);process.exit();}
       console.log('Session Info: '+JSON.stringify(reply));
-      var reqNum = 0;
+/*      var reqNum = 0;
       var id = setInterval(function(){
         t.throttleRequest(session_token,function(err,reply){
           reqNum++;
           console.log(reply);
           if(reqNum == 5)clearInterval(id);
         });
-      },1000);
+      },1000);*/
     });
   });
 }

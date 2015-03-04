@@ -60,7 +60,7 @@ function Turnstile(_config){
       var duration = policy.session_duration || 
         config.defaultPolicy['session_duration'];
 
-      client.zadd("active",(new Date()).valueOf()+duration,token,function(){});
+//      client.zadd("active",(new Date()).valueOf()+duration,token,function(){});
 
       client.pexpire(token,duration,
           function(_err,reply){
@@ -86,26 +86,18 @@ function Turnstile(_config){
       });
     },
     'getActiveSessions':function(callback){
-      client.exists("active",function(err,reply){
-        if(err)
-          return callback("INTERNAL_SERVER_ERROR"+err);
-        if(reply == 0)
-          return callback(null,{'sessions':[],'num_active':0});
-        else if(reply == 1){
-          client.zrange(["active",0,-1],function(err,reply){
-            if(err)
-              return callback("INTERNAL_SERVER_ERROR"+err);
-            else{
-              response = {};
-              response['sessions'] = [];
-              reply.forEach(function(item){
-                response['sessions'].push(item);
-              });
-              response['num_active'] = reply.length;
-              return callback(null,response);
-            }
-          }); 
-        }
+        client.keys("*",function(err,reply){
+          if(err)
+            return callback("INTERNAL_SERVER_ERROR"+err);
+          else{
+            response = {};
+            response['sessions'] = [];
+            reply.forEach(function(item){
+              response['sessions'].push(item);
+            });
+            response['num_active'] = reply.length;
+            return callback(null,response);
+          }
       });
     },
     'endSession':function(session,callback){
@@ -116,12 +108,7 @@ function Turnstile(_config){
           if(reply == 0)
               return callback(null,false);
           else if(reply == 1){
-            client.zrem(["active",session],function(err,_reply){
-              if(reply == 0)
-                return callback(null,false);
-              else if(reply == 1)
-                return callback(null,true);
-            });
+              return callback(null,true);
           }
         });
       }
@@ -197,25 +184,6 @@ function Turnstile(_config){
     },
   }
     
-  setInterval(function(){
-    if(methods.status() != "CONNECTED"){
-      console.error(methods.status());
-      return;
-    }
-  
-    client.exists("active",function(err,reply){
-      if(reply == 0){
-        console.error("No active sessions");
-        return;
-      }
-      else{
-        var now = new Date();
-        client.zremrangebyscore("active",0,now.valueOf(),
-          function(){});
-        return;
-      }
-    });
-  },config.evictionRate);
   extend(Turnstile.prototype,methods);
 }
 module.exports = Turnstile;

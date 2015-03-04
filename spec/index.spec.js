@@ -230,19 +230,33 @@ describe("Test throttling",function(){
       t.throttleRequest(sessionToken,function(err,reply){
         if(reply) count[0]++;
         else count[1]++;
-//        if(t+f>=5)clearInterval(id);
       });
     },100);
     util.waitAndRun(function(){
-      return (count[0]+count[1] >= 5);
+      return (count[0]+count[1] >= 10);
     },function(){
-      expect(count[1] > count[0]).toBe(true);
+      expect(count[0]/count[1]).toBeLessThan(0.3);
       done();
-    },5000);
+    },10000);
+  });
+
+  it("ends the session",function(done){
+    t.endSession(sessionToken,function(err,reply){
+      expect(err).toBe(null);
+      expect(reply).toBeTruthy();
+      done();
+    });
   });
 });
 
 describe("Teardown",function(){
+  it("checks redis client stability (expect no keys)",function(done){
+    redis_client.keys("*",function(err,reply){
+      expect(err).toBe(null);
+      expect(reply.length).toEqual(0);
+      done();
+    });
+  });
   it("flushes keys from redis at port "+PORT,function(done){
     redis_client.flushall(function(err,reply){
       expect(err).not.toBeTruthy();

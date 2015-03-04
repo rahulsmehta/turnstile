@@ -11,7 +11,7 @@
   },
   "devDependencies": {},
   "scripts": {
-    "test": "jasmine",
+    "test": "jasmine 2> /dev/null",
     "clean": "rm -f *.rdb *.log .*.swp"
   },
   "repository": {
