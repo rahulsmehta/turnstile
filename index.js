@@ -10,7 +10,7 @@ function Turnstile(_config){
   var config = {};
   config.port = _config.port || 6379;
   config.host = _config.host || "localhost";
-  config.evictionRate = _config.rate || 
+  config.evictionRate = _config.evictionRate || 
     120000;
   config.su = _config.su || false;
   config.framework = _config.framework || "express";
@@ -191,9 +191,16 @@ function Turnstile(_config){
   extend(Turnstile.prototype,methods);
   setInterval(function(){
     if(methods.status() == "CONNECTED"){
-    client.zremrangebyscore(['active',0,(new Date()).valueOf()],function(err,reply){
-      console.log("REPLY: %d",reply);
-    });}
+    client.zremrangebyscore(['active',0,(new Date()).valueOf()],
+      function(err,reply){
+        switch(reply){
+          case 1:
+            console.error("Evicted expired key from active");
+            break;
+          default:
+        }
+      });
+    }
   },config.evictionRate);
 }
 module.exports = Turnstile;
