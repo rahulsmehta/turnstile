@@ -1,8 +1,7 @@
 //TODO: ADD LIFESPAN PARAMETER TO POLICY (to replace session_duration)
 var redis = require('redis'),
     SHA256 = require('crypto-js/sha256'),
-    extend = require('extend'),
-    url = require('url');
+    extend = require('extend');
 
 DEBUG = true;
 
@@ -11,14 +10,13 @@ function Turnstile(_config){
   var config = {};
   config.port = _config.port || 6379;
   config.host = _config.host || "localhost";
-  config.evictionRate = _config.rate || 
+  config.evictionRate = _config.evictionRate || 
     120000;
   config.su = _config.su || false;
   config.framework = _config.framework || "express";
   config.defaultPolicy = _config.defaultPolicy ||
     {'req_per_int':100,'session_duration':86400000};
   var client = null;
-
 
   var methods = {
     'status': function(){return (client)?"CONNECTED":"NOT CONNECTED";},
@@ -54,13 +52,15 @@ function Turnstile(_config){
       client.hset([token,"policy",JSON.stringify(policy)],function(){});
       client.hset([token,"allowance",policy.req_per_int],function(){});
       client.hset([token,"rate",policy.req_per_int],function(){});
-      client.hset([token,"last_msg",(new Date()).valueOf()],function(){});
+      var now = (new Date()).valueOf();
+      client.hset([token,"last_msg",now],function(){});
 
 
       var duration = policy.session_duration || 
         config.defaultPolicy['session_duration'];
 
-//      client.zadd("active",(new Date()).valueOf()+duration,token,function(){});
+      client.zadd("active",now+duration,token,function(err,reply){
+      });
 
       client.pexpire(token,duration,
           function(_err,reply){
@@ -86,7 +86,8 @@ function Turnstile(_config){
       });
     },
     'getActiveSessions':function(callback){
-        client.keys("*",function(err,reply){
+        client.zrange(['active',0,-1],
+            function(err,reply){
           if(err)
             return callback("INTERNAL_SERVER_ERROR"+err);
           else{
@@ -108,7 +109,10 @@ function Turnstile(_config){
           if(reply == 0)
               return callback(null,false);
           else if(reply == 1){
-              return callback(null,true);
+              client.zrem(['active',session],function(_err,_reply){
+                if(_err) return callback("INTERNAL_SERVER_ERROR");
+                return callback(null,true);
+              });
           }
         });
       }
@@ -185,5 +189,18 @@ function Turnstile(_config){
   }
     
   extend(Turnstile.prototype,methods);
+  setInterval(function(){
+    if(methods.status() == "CONNECTED"){
+    client.zremrangebyscore(['active',0,(new Date()).valueOf()],
+      function(err,reply){
+        switch(reply){
+          case 1:
+            console.error("Evicted expired key from active");
+            break;
+          default:
+        }
+      });
+    }
+  },config.evictionRate);
 }
 module.exports = Turnstile;
