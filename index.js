@@ -1,8 +1,7 @@
 //TODO: ADD LIFESPAN PARAMETER TO POLICY (to replace session_duration)
 var redis = require('redis'),
     SHA256 = require('crypto-js/sha256'),
-    extend = require('extend'),
-    RedisNotifier = require('redis-notifier');
+    extend = require('extend');
 
 DEBUG = true;
 
@@ -18,14 +17,6 @@ function Turnstile(_config){
   config.defaultPolicy = _config.defaultPolicy ||
     {'req_per_int':100,'session_duration':86400000};
   var client = null;
-
-  var eventNotifier = new RedisNotifier(redis, {
-    'redis':{'host':config.host,'port':config.port},
-    'expired':true,
-    'evicted':true,
-    'logLevel':'DEBUG'
-  });
-
 
   var methods = {
     'status': function(){return (client)?"CONNECTED":"NOT CONNECTED";},
@@ -198,5 +189,11 @@ function Turnstile(_config){
   }
     
   extend(Turnstile.prototype,methods);
+  setInterval(function(){
+    if(methods.status() == "CONNECTED"){
+    client.zremrangebyscore(['active',0,(new Date()).valueOf()],function(err,reply){
+      console.log("REPLY: %d",reply);
+    });}
+  },config.evictionRate);
 }
 module.exports = Turnstile;
