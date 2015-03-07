@@ -220,7 +220,7 @@ function Turnstile(_config){
         function(err,reply){
           switch(reply){
             case 1:
-              console.log("Evicted expired key from active");
+              console.error("Evicted expired key from active");
               break;
             default:
           }
