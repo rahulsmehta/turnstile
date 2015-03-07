@@ -3,4 +3,5 @@
 *.DS_STORE
 *.rdb
 *.log
+app.js
 node_modules

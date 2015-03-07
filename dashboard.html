@@ -1,0 +1,120 @@
+<!DOCTYPE>
+<html>
+<head>
+  <title>New Poll | Pollster.io</title>
+  <link rel="stylesheet" type="text/css" 
+  href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
+
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+  <script src="https://cdn.socket.io/socket.io-1.3.4.js"></script>
+  <script src="https://cdn.rawgit.com/montagejs/collections/master/collections.min.js"></script>
+  <script type="text/javascript"
+            src="https://www.google.com/jsapi?autoload={
+              'modules':[{
+                'name':'visualization',
+                'version':'1',
+                'packages':['corechart']
+              }]
+            }"></script>
+</head>
+
+<body>
+  <div class="container">
+  <div class="row">
+    <center> <h3>API Dashboard</h3></center>
+  </div>
+  <div class="row">
+    <div class="col-md-2">
+      <h4> New Sessions </h4>
+      <ul id="sessions">
+      </ul>
+    </div>
+    <div class="col-md-2">
+      <h4>Recent Requests</h4> 
+      <ul id="recent">
+      </ul>
+    </div>
+    <div class="col-md-6">
+      <div id="chart" style="width:700px;height:400px"></div>
+    </div>
+
+  </div>
+</div>
+<script>
+  var DISPLAY_NUM = 10;
+  var MAX_SIZE = 50;
+
+  var session_queue = [],
+      recent_queue = [],
+      load_queue = [];
+
+  google.setOnLoadCallback(drawChart);
+  
+  var drawChart = function(){
+    var q = [];
+    var now = (new Date()).valueOf();
+    load_queue.forEach(function(item){
+      var _toAdd = [];
+      _toAdd[0] = (parseInt(item[1])-now)/1000;
+      _toAdd[1] = parseInt(item[0]);
+      q.push(_toAdd);
+    });
+    q.unshift(['Active','Time']);
+    console.log(q);
+    var data = google.visualization.arrayToDataTable(q);
+    var options = {
+      hAxis:{title:'Time (seconds since now)'},
+      legend:'none',
+      curveType:'function'
+    };
+
+    var chart = new google.visualization.LineChart(document.getElementById('chart'));
+    chart.draw(data,options);
+  };
+
+
+  // --- QUEUE API ---
+  var addToQueue = function(queue,data){
+    if(queue.length >= MAX_SIZE){
+      var last = queue.shift();
+    }
+    queue.push(data);
+//    console.log("queue after adding: "+queue);
+  };
+
+  var drawQueue = function(destElem,queue,toDraw){
+    var dest = document.getElementById(destElem);
+    dest.innerHTML = "";
+    for(var i=1;i<=toDraw;i++){
+      var ind = queue.length-i;
+      if(ind < 0)break;
+      var _data = queue[ind];
+      var el = document.createElement('li');
+      el.innerHTML = _data.uid+" - "+_data.session_token;
+      dest.appendChild(el);
+    }
+  };
+  // --- END QUEUE API ---
+
+  var socket = io('http://localhost:3000');
+  socket.on('new_session',function(data){
+ //   console.log(data);
+    addToQueue(session_queue,data);
+    drawQueue('sessions',session_queue,DISPLAY_NUM);
+  });
+
+  socket.on('num_active',function(data){
+    addToQueue(load_queue,data);
+    drawChart();
+  });
+
+  socket.on('request',function(data){
+    addToQueue(recent_queue,data);
+    drawQueue('recent',recent_queue,DISPLAY_NUM);
+  });
+
+</script>
+</body>
+
+</html>

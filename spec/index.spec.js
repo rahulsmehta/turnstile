@@ -4,6 +4,7 @@ var Turnstile = require('../index.js'),
     p_redis = null,
     redis_client = null,
     PORT = 7000,
+    EVICTION_RATE = 2000,
     _env = "";
 
 var util = {
@@ -64,7 +65,7 @@ describe("Create test instance",function(){
 
 
   it("creates Turnstile instance",function(){
-    t = new Turnstile({'su':true,'port':PORT,'evictionRate':2000});
+    t = new Turnstile({'su':true,'port':PORT,'evictionRate':EVICTION_RATE});
     expect(t).not.toBeNull();
   });
   it("connects to redis at port "+PORT,function(){
@@ -75,7 +76,7 @@ describe("Create test instance",function(){
     redis_client = t.getRedisClient();
     expect(redis_client).not.toBeNull();
   });
-  it("flushes all keys from redis at port "+7000,function(done){
+  it("flushes all keys from redis at port "+PORT,function(done){
     redis_client.flushall(function(err,reply){
       expect(err).not.toBeTruthy();
       expect(reply).toEqual("OK");
@@ -92,16 +93,16 @@ describe("Test property retreival",function(){
     test_config['evictionRate'] = t.getPropSync('evictionRate');
     test_config['su'] = t.getPropSync('su');
 
-    expect(test_config['port']).toEqual(7000);
+    expect(test_config['port']).toEqual(PORT);
     expect(test_config['host']).toEqual("localhost");
-    expect(test_config['evictionRate']).toEqual(120000);
+    expect(test_config['evictionRate']).toEqual(EVICTION_RATE);
     expect(test_config['su']).toBe(true);
 
   });
   it("retrieves port (async)",function(done){
     t.getProp('port',function(err,reply){
       expect(err).toBeNull();
-      expect(reply).toEqual(7000);
+      expect(reply).toEqual(PORT);
       done();
     });
   });
@@ -117,7 +118,7 @@ describe("Test property retreival",function(){
   it("retrieves eviction rate (async)",function(done){
     t.getProp('evictionRate',function(err,reply){
       expect(err).toBeNull();
-      expect(reply).toEqual(120000);
+      expect(reply).toEqual(EVICTION_RATE);
       done();
     });
   });
@@ -246,6 +247,32 @@ describe("Test throttling",function(){
       expect(reply).toBeTruthy();
       done();
     });
+  });
+});
+
+describe("Test expired key eviction",function(){
+  var sessionToken = null;
+  it("creates a session token with 2s lifespan",function(done){
+    var policy = {'req_per_int':2,'session_duration':2000};
+    t.genSessionToken(util.user('test_user',"TEST_KEY"),policy,
+      function(err,reply){
+      expect(err).toBe(null);
+      expect(reply).toBeTruthy();
+      sessionToken = reply.session_token;
+      expect(sessionToken.length).toEqual(15);
+      done();
+    });
+  });
+
+  it("checks to see if key is active after 3s",function(done){
+    setTimeout(function(){
+      t.getActiveSessions(function(err,reply){
+        expect(err).toBe(null);
+        expect(reply).toBeTruthy();
+        expect(reply.num_active).toEqual(0);
+        done();
+      });
+    },3000);
   });
 });
 

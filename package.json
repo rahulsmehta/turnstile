@@ -5,15 +5,18 @@
   "main": "main.js",
   "dependencies": {
     "crypto-js": "^3.1.2-5",
+    "express": "^4.12.2",
     "extend": "^2.0.0",
     "jasmine": "^2.2.1",
-    "redis": "^0.12.1"
+    "redis": "^0.12.1",
+    "socket.io": "^1.3.5"
   },
   "devDependencies": {},
   "scripts": {
-    "test": "./scripts/start_test_server.sh && jasmine 2> /dev/null && ./scripts/stop_test_server.sh",
-    "clean": "rm -f *.rdb *.log .*.swp",
-    "travis":"jasmine 2> /dev/null"
+    "pretest": "./scripts/start_test_server.sh",
+    "test": "jasmine 2> /dev/null",
+    "posttest": "./scripts/stop_test_server.sh",
+    "clean": "rm -f *.rdb *.log .*.swp"
   },
   "repository": {
     "type": "git",
