@@ -1,7 +1,8 @@
 //TODO: ADD LIFESPAN PARAMETER TO POLICY (to replace session_duration)
 var redis = require('redis'),
     SHA256 = require('crypto-js/sha256'),
-    extend = require('extend');
+    extend = require('extend'),
+    app = require('express')();
 
 DEBUG = true;
 
@@ -17,6 +18,18 @@ function Turnstile(_config){
   config.defaultPolicy = _config.defaultPolicy ||
     {'req_per_int':100,'session_duration':86400000};
   var client = null;
+
+  // --- Dashboard web server ----
+  app.get('/',function(req,res){
+    res.sendFile(__dirname+"/dashboard.html");
+  });
+  var server = app.listen(3000);
+  var io = require('socket.io')(server);
+  
+  io.on('connection',function(socket){
+    console.error("New connection from %s",socket.id);
+  });
+  // ----------------------------------------
 
   var methods = {
     'status': function(){return (client)?"CONNECTED":"NOT CONNECTED";},
@@ -60,12 +73,16 @@ function Turnstile(_config){
         config.defaultPolicy['session_duration'];
 
       client.zadd("active",now+duration,token,function(err,reply){
+        client.zcount(['active','-inf','+inf'],function(err,reply){
+          io.emit('num_active',[reply,(new Date()).valueOf()]);
+        });
       });
 
       client.pexpire(token,duration,
           function(_err,reply){
-            //console.error("Generated new session token for %s: %s",display,token);
-            return callback(null,{'api_key':user.api_key,'session_token':token});
+            var _data = {'last_msg':now,'uid':user.uid,'api_key':user.api_key,'session_token':token};
+            io.emit('new_session',_data);
+            return callback(null,_data);
           });
     },
     'getSessionInfo': function(sessionToken,callback){
@@ -110,6 +127,9 @@ function Turnstile(_config){
               return callback(null,false);
           else if(reply == 1){
               client.zrem(['active',session],function(_err,_reply){
+                client.zcount(['active','-inf','+inf'],function(err,reply){
+                  io.emit('num_active',[reply,(new Date()).valueOf()]);
+                });
                 if(_err) return callback("INTERNAL_SERVER_ERROR");
                 return callback(null,true);
               });
@@ -172,6 +192,8 @@ function Turnstile(_config){
             console.error("Throttle request...discarding...");
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){
+              io.emit('request',{'uid':reply.uid,
+                'session_token':sessionToken,'result':false});
               return callback(null,false);
             });
           }
@@ -180,6 +202,8 @@ function Turnstile(_config){
             allowance--;
             methods.setThrottleParams(sessionToken,now,
               allowance,function(){
+              io.emit('request',{'uid':reply.uid,
+                'session_token':sessionToken,'result':true});
               return callback(null,true);
             });
           }
@@ -187,18 +211,22 @@ function Turnstile(_config){
       });
     },
   }
+  
     
   extend(Turnstile.prototype,methods);
   setInterval(function(){
     if(methods.status() == "CONNECTED"){
-    client.zremrangebyscore(['active',0,(new Date()).valueOf()],
-      function(err,reply){
-        switch(reply){
-          case 1:
-            console.error("Evicted expired key from active");
-            break;
-          default:
-        }
+      client.zremrangebyscore(['active',0,(new Date()).valueOf()],
+        function(err,reply){
+          switch(reply){
+            case 1:
+              console.log("Evicted expired key from active");
+              break;
+            default:
+          }
+        });
+      client.zcount(['active','-inf','+inf'],function(err,reply){
+        io.emit('num_active',[reply,(new Date()).valueOf()]);
       });
     }
   },config.evictionRate);
