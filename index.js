@@ -16,7 +16,7 @@ function Turnstile(_config){
   config.su = _config.su || false;
   config.framework = _config.framework || "express";
   config.defaultPolicy = _config.defaultPolicy ||
-    {'req_per_int':100,'session_duration':86400000};
+    {'req_per_int':100,'session_interval':10000,'session_duration':86400000};
   var client = null;
 
   // --- Dashboard web server ----
@@ -64,6 +64,7 @@ function Turnstile(_config){
       client.hset([token,"uid",user.uid],function(){});
       client.hset([token,"policy",JSON.stringify(policy)],function(){});
       client.hset([token,"allowance",policy.req_per_int],function(){});
+      client.hset([token,"interval",policy.session_interval],function(){});
       client.hset([token,"rate",policy.req_per_int],function(){});
       var now = (new Date()).valueOf();
       client.hset([token,"last_msg",now],function(){});
@@ -97,6 +98,7 @@ function Turnstile(_config){
           client.pttl(sessionToken,function(err,ttl){
             response['ttl'] = ttl;
             delete response['allowance'];
+            delete response['interval'];
             return callback(null,response);
           });
         }
@@ -175,12 +177,12 @@ function Turnstile(_config){
           var delta = now-reply.last_msg;
           console.error("Difference: %d",delta);
           var rate = reply.rate;
+          var interval = reply.interval;
           console.error("Allowance (before): %d",reply.allowance);
-          //var allowance = (reply.allowance + delta*(rate/10000))/10; 
 
           var allowance = parseFloat(reply.allowance);
-          var tok = delta*(rate/10000);
-          allowance += delta*(rate/10000);
+          var tok = delta*(rate/interval);
+          allowance += delta*(rate/interval);
 
           console.error("Allowance (after): %d",allowance);
           console.error("Rate: %d",rate);

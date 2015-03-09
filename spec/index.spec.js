@@ -30,7 +30,7 @@ var util = {
     user['api_key'] = key || "TEST_KEY"+(Math.floor(Math.random()*1000));
     return user;
   },
-  'policy':{'req_per_int':100,'session_duration':86400000},
+  'policy':{'req_per_int':100,'session_interval':10000,'session_duration':86400000},
 }
 
 
@@ -214,7 +214,7 @@ describe("Test token generation and session info",function(){
 describe("Test throttling",function(){
   var sessionToken = null;
   it("generates a session token",function(done){
-    var policy = {'req_per_int':2,'session_duration':10000};
+    var policy = {'req_per_int':2,'session_interval':10000,'session_duration':10000};
     t.genSessionToken(util.user("test_user","TEST_KEY"),policy,
       function(err,reply){
       expect(err).toBe(null);
@@ -253,7 +253,7 @@ describe("Test throttling",function(){
 describe("Test expired key eviction",function(){
   var sessionToken = null;
   it("creates a session token with 2s lifespan",function(done){
-    var policy = {'req_per_int':2,'session_duration':2000};
+    var policy = {'req_per_int':2,'session_interval':10000,'session_duration':2000};
     t.genSessionToken(util.user('test_user',"TEST_KEY"),policy,
       function(err,reply){
       expect(err).toBe(null);
