@@ -8,14 +8,14 @@ Lightweight, policy-based request throttling.
 
 Turnstile provides a lightweight request throttling service, and is framework-independent. Turnstile was developed with Express versions 4.0 and greater in mind, though it should work with any other web framework, or any other application which requires large-scale function/process throttling. Turnstile can be installed with `npm`;
 
-	npm install turnstile
+	npm install turnstile-js
     
 ##Usage
 
 First, import the Turnstile module. Then, create a new instance and connect it to Redis.
 
 ```javascript
-var Turnstile = require('turnstile');
+var Turnstile = require('turnstile-js');
 var client_t = new Turnstile(options);
 client_t.connect();
 ```
