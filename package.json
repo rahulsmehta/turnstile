@@ -1,5 +1,5 @@
 {
-  "name": "turnstile",
+  "name": "turnstile-js",
   "version": "0.0.1",
   "description": "Lightweight, policy-based request throttling built on Redis.",
   "main": "index.js",
