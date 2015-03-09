@@ -2,7 +2,7 @@
   "name": "turnstile",
   "version": "0.0.1",
   "description": "Lightweight, policy-based request throttling built on Redis.",
-  "main": "main.js",
+  "main": "index.js",
   "dependencies": {
     "crypto-js": "^3.1.2-5",
     "express": "^4.12.2",
@@ -22,7 +22,7 @@
     "type": "git",
     "url": "https://github.com/rahulsmehta/turnstile.git"
   },
-  "author": "",
+  "author": "Rahul Mehta <mehta.rahul95@gmail.com> (https://github.com/rahulsmehta)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/rahulsmehta/turnstile/issues"
