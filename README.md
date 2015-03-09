@@ -12,11 +12,38 @@ Turnstile provides a lightweight request throttling service, and is framework-in
     
 ##Usage
 
-First, import the Turnstile module.
+First, import the Turnstile module. Then, create a new instance and connect it to Redis.
 
 ```javascript
-var client_t = require('turnstile');
+var Turnstile = require('turnstile');
+var client_t = new Turnstile(options);
+client_t.connect();
 ```
+
+The options object takes the following parameters (with the following defaults):
+
+```javascript
+options = {
+	su: false,
+	port: 6379,
+	host: "localhost",
+	evictionRate: 120000,
+	framework: "express",
+	defaultPolicy:{
+		req_per_int:100,
+		session_interval:10000,
+		session_duration:86400000
+	}
+}
+```
+
+`su` - superuser: Setting this to `true` will give the Turnstile client access to the underlying connection to Redis with the `client_t.getRedisClient()` function.
+`port` - the port that Turnstile will use to connect to Redis. **Warning:** Turnstile should use a separate Redis instance from any data the application depends on.
+`host` - the hostname of the Redis instance for the Turnstile connection (defaults to `localhost`).
+`evictionRate` - the rate at which Turnstile evicts expired session tokens from the active sessions list. At this time, support for Redis keyspace notifications is experimental; when it becomes a stable feature this functionality of Turnstile will be phased out.
+`defaultPolicy` - the default policy for an API user. The default above is simply a placeholder - this parameter should be set by the organization.
+
+The policy object takes the parameters `req_per_int` and `session_duration`.  The first parameter is used to determine the number of requests that the client can make during `session_interval`. That is, Turnstile limits the number of requests a user can make to at most `req_per_int`/`session_interval`. The units for all time parameters are in ms. `session_duration` denotes the lifespan of the session - after that many ms, the session token will expire and be evicted from the active sessions list.
 
 The remainder of the examples will assume Express.js version 4.0 or greater. We are currently in the process of 
 testing other web frameworks. 
@@ -30,16 +57,19 @@ app.get('/api/get_session_token/*',function(request,response){
 	// Process request
     ...
     var apiKey = client_t.getApiKey(request.path);
-    var sessionToken = client_t.genSessionToken(apiKey,{
+    client_t.genSessionToken(apiKey,{
     	'req_per_int':100,
         'session_duration':86400000
-    });
-    ...
-    response.status(200).send(JSON.stringify({
-    	...
-        'session_token':sessionToken,
-        ...
-    }));
+    }, function(err,reply){
+		if(err) res.status(500).send("Internal server error");
+		else
+			res.send(200).send({
+			...
+			session_token = reply.session_token,
+			...
+			}
+	});
+    
 });
 ```
 
@@ -53,11 +83,9 @@ The client can generate a new session token with the following request:
 	GET /api/get_session_token/<api_key>
     
 
-Now, for any endpoint that the client wishes to throttle requests to, simply include the session token
-within the request URL for any `GET` request, and in the request body for any `POST` or `PUT` request.
+Now, for any endpoint that the client wishes to throttle requests to, simply include the session token within the request URL for any `GET`, `PUT` or `POST` request.
 
-Though there are many methods for doing this, the suggested approach is to include the session token
-in the query string of the request.
+Though there are many methods for doing this, the suggested approach is to include the session tokenin the query string of the request.
 
 ```javascript
 app.get('/api/some_resource/',function(request,response){
@@ -65,12 +93,14 @@ app.get('/api/some_resource/',function(request,response){
     // Process request
     ...
     var sessionToken = client_t.sessionToken(request);
-    var allow = client_t.throttleRequest(sessionToken);
-    ...
-    if(allow)
-    	response.status(200).send(...);
-    else
-    	response.status(429).send("Exceeded request allowance");
+    client_t.throttleRequest(sessionToken,function(err,allow){
+		if(allow)
+	    	response.status(200).send(...);
+	    else
+	    	response.status(429)
+	    	.send("Exceeded request allowance");
+	});
+    
 });
 ```
 
@@ -78,25 +108,24 @@ This throttled endpoint could be accessed by the client with the following reque
 
 	GET /api/some_resource?session_token=<session_token>
     
-For `POST` and `PUT` requests, the following will throttle an endpoint with the session token.
+For `POST` and `PUT` requests, simply replace `app.get` with either `app.post` or `app.put`.
 
-```javascript
-app.post('/api/some_other_resource',function(request,response){
-	...
-    // Process request
-    ...
-    var sessionToken = client_t.sessionToken(request);
-    var allow = client_t.throttleRequest(sessionToken);
-    ...
-    if(allow)
-    	response.status(200).send(...);
-    else
-    	response.status(429).send("Exceeded request allowance");
-});
-```
-A request to this endpoint could look like;
 
-	POST /api/some_other_resource?session_token=<session_token>
+##API Reference
+The following functions are available for an instance of Turnstile. All references to `Client` denote an instantiated Turnstile object (constructed with `new Turnstile(options)`).
+
+ - `Client.status` - Returns `CONNECTED` or `NOT CONNECTED` depending on whether or not the Turnstile client has an active connection with Redis.
+ - `Client.connect` - Connect the Turnstile client to Redis at the address specified in `options`.
+ - `Client.getProp` - Get the value of the specified property from the Turnstile client. Takes parameters `propertyName` and a callback. The callback is passed parameters `err` and `reply`.
+ - `Client.getPropSync` - Synchronous implementation of the above method. Takes one parameter, namely `propertyName`.
+ - `Client.genSessionToken` - Generates a session token for the specified `user` with a particular `policy`. The `user` object has the fields `api_key` and `uid`, and defaults to `defaultPolicy` if not otherwise specified. The callback is passed the parameters `err` and `reply`. The session token will be exposed at `reply.session_token`.
+ - `Client.getSessionInfo` - Takes parameters `session_token` and a callback. If the session token exists, `reply` will have the fields `api_key`, `uid`, `policy`, `last_msg` (time of last message received), and `ttl` (the remaining time until the session expires).
+ - `Client.getActiveSessions` - Retrieve all active sessions. `reply` will have the fields `sessions`, which is an array of the active session tokens, and `num_active`, an integer field for the number of active sessions.
+ - `Client.endSession` - Ends the session specified by parameter `session_token`. `reply` will be true if deletion was successful, or false if the key was not found or the deletion was unsuccessful.
+ - `Client.throttleRequest` - Records the request specified by `session_token`. If the allowance is exceeded, `reply` will be `false`, and if it is permitted, will be `true`.
+
+### Dashboard
+Turnstile also provides a dashboard for users to monitor the current usage of their API, as well as a list of recently-created sessions and recent requests. Currently, it is available at `hostname:3030`. This feature is still under development, so submit an issue or a pull request with features if you wish to contribute.
 
 ## Testing
 Tests for turnstile are written for the Jasmine unit testing framework. To run the tests, start
@@ -163,10 +192,3 @@ This is a standard implementation of the token bucket algorithm. Line 7 is an op
 token to the bucket every `(rate/duration)` seconds. Note that the allowance is capped by `rate`; that is, 
 even if a session token is generated and no requests to the API are made for a long period of time, the 
 maximum number of requests that can be made "at once" is still limited by `rate`.
-
-
-
-
-
-
-
